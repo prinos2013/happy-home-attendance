@@ -209,7 +209,7 @@
 
             <!-- Top Absentees Warning List -->
             <div class="mt-6">
-                <h3 class="text-md font-bold text-red-600 mb-3"><i class="fa-solid fa-triangle-exclamation"></i> Action Required: Top Absentees (3+ Absences)</h3>
+                <h3 class="text-md font-bold text-red-600 mb-3"><i class="fa-solid fa-triangle-exclamation"></i> Action Required: Top Absentees (2+ Absences)</h3>
                 <div id="topAbsenteesList" class="divide-y border border-red-100 rounded-xl overflow-hidden bg-white shadow-sm">
                     <div class="p-6 text-center text-sm text-gray-400">Loading data...</div>
                 </div>
@@ -363,7 +363,7 @@
         function renderTopAbsentees(data) {
             const listEl = document.getElementById('topAbsenteesList');
             if (data.length === 0) {
-                listEl.innerHTML = '<div class="p-6 text-center text-sm text-gray-500"><i class="fa-solid fa-check-circle text-green-500 text-2xl mb-2 block"></i>No students with 3 or more absences. Great job!</div>';
+                listEl.innerHTML = '<div class="p-6 text-center text-sm text-gray-500"><i class="fa-solid fa-check-circle text-green-500 text-2xl mb-2 block"></i>No students with 2 or more absences. Great job!</div>';
                 return;
             }
             let html = '';
