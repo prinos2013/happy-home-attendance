@@ -12,19 +12,16 @@
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        
         .toggle-checkbox:checked { right: 0; border-color: #10B981; }
         .toggle-checkbox:checked + .toggle-label { background-color: #10B981; }
         .toggle-checkbox:checked + .toggle-label:after { content: "Present"; color: white; font-size: 0.75rem; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); }
         .toggle-label:after { content: "Absent"; color: white; font-size: 0.75rem; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
-        
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3B82F6; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="text-gray-800 h-screen flex flex-col overflow-hidden">
 
-    <!-- App Header -->
     <header class="bg-blue-700 text-white shadow-md z-10 flex-shrink-0">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
@@ -39,7 +36,6 @@
             </div>
         </div>
         
-        <!-- Navigation Tabs -->
         <nav class="flex overflow-x-auto bg-blue-800">
             <button onclick="switchTab('attendance')" id="tab-btn-attendance" class="flex-1 py-3 px-4 text-center text-sm font-medium border-b-4 border-white text-white whitespace-nowrap"><i class="fa-solid fa-clipboard-user mr-1"></i> Mark</button>
             <button onclick="switchTab('students')" id="tab-btn-students" class="flex-1 py-3 px-4 text-center text-sm font-medium border-b-4 border-transparent text-blue-200 hover:text-white whitespace-nowrap"><i class="fa-solid fa-users mr-1"></i> Students</button>
@@ -50,7 +46,6 @@
         </nav>
     </header>
 
-    <!-- Main Content Area -->
     <main class="flex-1 overflow-y-auto p-4 container mx-auto max-w-3xl relative">
         <div id="toastContainer" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-11/12 max-w-sm pointer-events-none"></div>
 
@@ -93,8 +88,12 @@
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold">Manage Students</h2>
                 <div class="flex gap-2">
-                    <button onclick="fetchGlobalStudents()" class="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-lg text-sm font-medium transition"><i class="fa-solid fa-cloud-arrow-down mr-1"></i> Pull</button>
-                    <button onclick="openAddStudentModal()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium transition"><i class="fa-solid fa-plus mr-1"></i> Add New</button>
+                    <button onclick="fetchGlobalStudents()" class="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1.5 rounded-lg text-sm font-medium transition shadow-sm"><i class="fa-solid fa-cloud-arrow-down mr-1"></i> Pull</button>
+                    
+                    <!-- Toggle Button to show Add/Remove Functions -->
+                    <button onclick="toggleManageMode()" id="manageModeBtn" class="bg-purple-100 text-purple-700 hover:bg-purple-200 px-3 py-1.5 rounded-lg text-sm font-medium transition shadow-sm"><i class="fa-solid fa-unlock mr-1"></i> Add / Remove</button>
+                    
+                    <button onclick="openAddStudentModal()" id="addStudentBtn" class="hidden bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium transition shadow-sm"><i class="fa-solid fa-plus mr-1"></i> New</button>
                 </div>
             </div>
 
@@ -177,7 +176,7 @@
                 </div>
             </div>
             <div class="p-4 border-t bg-gray-50 rounded-b-xl flex justify-end gap-2">
-                <button onclick="closeStudentModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg text-sm font-medium transition">Cancel</button>
+                <button onclick="closeStudentModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg text-sm font-medium transition shadow-sm">Cancel</button>
                 <button onclick="saveStudent()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition shadow-sm">Save Student</button>
             </div>
         </div>
@@ -194,8 +193,8 @@
             isOnline: navigator.onLine
         };
         let chartInstance = null;
+        let manageMode = false;
 
-        // App Initialization
         window.addEventListener('DOMContentLoaded', () => {
             initSelects();
             document.getElementById('attendanceDate').valueAsDate = new Date();
@@ -204,10 +203,9 @@
             updateNetworkStatus();
             updateSyncBadge();
             renderLogs();
-            fetchGlobalStudents(); // Instantly pull students from cloud on load
+            fetchGlobalStudents(); 
         });
 
-        // Tab Navigation
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('nav button').forEach(btn => {
@@ -224,6 +222,26 @@
             if(tabId === 'attendance') renderAttendanceList();
             if(tabId === 'sync') updateSyncBadge();
             if(tabId === 'dashboard') fetchStatsAndRenderChart(); 
+        }
+
+        // --- MANAGE MODE TOGGLE ---
+        function toggleManageMode() {
+            manageMode = !manageMode;
+            const btn = document.getElementById('manageModeBtn');
+            const addBtn = document.getElementById('addStudentBtn');
+            
+            if(manageMode) {
+                btn.classList.replace('bg-purple-100', 'bg-gray-200');
+                btn.classList.replace('text-purple-700', 'text-gray-700');
+                btn.innerHTML = '<i class="fa-solid fa-lock mr-1"></i> Lock Editing';
+                addBtn.classList.remove('hidden');
+            } else {
+                btn.classList.replace('bg-gray-200', 'bg-purple-100');
+                btn.classList.replace('text-gray-700', 'text-purple-700');
+                btn.innerHTML = '<i class="fa-solid fa-unlock mr-1"></i> Add / Remove';
+                addBtn.classList.add('hidden');
+            }
+            renderStudentsList();
         }
 
         // --- GLOBAL STUDENTS SYNC LOGIC ---
@@ -265,7 +283,6 @@
             closeStudentModal();
             showToast('Student saved locally. Syncing to cloud...');
 
-            // Push to cloud immediately
             if (state.isOnline) {
                 try {
                     await fetch(`${API_BASE}/api/students`, {
@@ -358,7 +375,6 @@
             window.open(`${API_BASE}/export`, '_blank');
         }
 
-        // Utility Functions
         function generateId() { return Math.random().toString(36).substr(2, 9) + Date.now().toString(36); }
         function saveToLocal(key, data) { localStorage.setItem(`attendIct_${key}`, JSON.stringify(data)); }
 
@@ -382,7 +398,6 @@
             });
         }
 
-        // ----- STUDENT MANAGEMENT -----
         function renderStudentsList() {
             const listEl = document.getElementById('studentsList');
             const filterClass = document.getElementById('filterStudentClass').value;
@@ -409,7 +424,7 @@
                         </div>
                         <div class="flex gap-2">
                             <button onclick='editStudent(${JSON.stringify(student).replace(/'/g, "&#39;")})' class="w-8 h-8 rounded bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 transition flex items-center justify-center"><i class="fa-solid fa-pen text-xs"></i></button>
-                            <button onclick="deleteStudent('${student.id}')" class="w-8 h-8 rounded bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 transition flex items-center justify-center"><i class="fa-solid fa-trash text-xs"></i></button>
+                            ${manageMode ? `<button onclick="deleteStudent('${student.id}')" class="w-8 h-8 rounded bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition flex items-center justify-center"><i class="fa-solid fa-trash text-xs"></i></button>` : ''}
                         </div>
                     </div>
                 `;
@@ -438,7 +453,6 @@
             setTimeout(() => { modal.classList.add('hidden'); }, 300);
         }
 
-        // ----- ATTENDANCE LOGIC -----
         function renderAttendanceList() {
             const date = document.getElementById('attendanceDate').value;
             const classId = document.getElementById('attendanceClass').value;
@@ -483,7 +497,6 @@
             saveToLocal('attendance', state.attendance); showToast(`Attendance saved for ${classId} (Offline)`); updateSyncBadge();
         }
 
-        // ----- NETWORK & SYNC LOGIC -----
         function updateNetworkStatus() {
             state.isOnline = navigator.onLine;
             const statusEl = document.getElementById('networkStatus'); const syncBtn = document.getElementById('syncNowBtn');
