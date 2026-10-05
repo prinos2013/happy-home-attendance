@@ -192,13 +192,26 @@
             <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
                 <div class="flex justify-between items-center mb-4">
                     <p class="text-sm text-gray-500">Live data pulled securely from your cloud database.</p>
-                    <button onclick="fetchStatsAndRenderChart()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center">
-                        <i class="fa-solid fa-rotate mr-1"></i> Refresh
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="downloadCSV()" class="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center shadow-sm">
+                            <i class="fa-solid fa-file-csv mr-1"></i> Export
+                        </button>
+                        <button onclick="fetchStatsAndRenderChart()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center shadow-sm">
+                            <i class="fa-solid fa-rotate mr-1"></i> Refresh
+                        </button>
+                    </div>
                 </div>
                 <!-- Chart Container -->
                 <div class="relative h-72 w-full">
                     <canvas id="attendanceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Absentees Warning List -->
+            <div class="mt-6">
+                <h3 class="text-md font-bold text-red-600 mb-3"><i class="fa-solid fa-triangle-exclamation"></i> Action Required: Top Absentees (3+ Absences)</h3>
+                <div id="topAbsenteesList" class="divide-y border border-red-100 rounded-xl overflow-hidden bg-white shadow-sm">
+                    <div class="p-6 text-center text-sm text-gray-400">Loading data...</div>
                 </div>
             </div>
         </section>
@@ -289,18 +302,19 @@
             }
 
             try {
-                // Fetch stats from the new Render endpoint
+                // Fetch Chart Stats
                 const response = await fetch('https://happy-home-attendance.onrender.com/stats');
                 const result = await response.json();
+                if (result.success) drawChart(result.data);
 
-                if (result.success) {
-                    drawChart(result.data);
-                } else {
-                    showToast("Failed to load statistics", "error");
-                }
+                // Fetch Top Absentees
+                const absRes = await fetch('https://happy-home-attendance.onrender.com/top-absentees');
+                const absData = await absRes.json();
+                if (absData.success) renderTopAbsentees(absData.data);
+                
             } catch (error) {
                 console.error("Error fetching stats:", error);
-                showToast("Error connecting to server for stats", "error");
+                showToast("Error connecting to server", "error");
             }
         }
 
@@ -344,6 +358,34 @@
                     }
                 }
             });
+        }
+
+        function renderTopAbsentees(data) {
+            const listEl = document.getElementById('topAbsenteesList');
+            if (data.length === 0) {
+                listEl.innerHTML = '<div class="p-6 text-center text-sm text-gray-500"><i class="fa-solid fa-check-circle text-green-500 text-2xl mb-2 block"></i>No students with 3 or more absences. Great job!</div>';
+                return;
+            }
+            let html = '';
+            data.forEach(student => {
+                html += `
+                    <div class="p-4 flex justify-between items-center hover:bg-gray-50 transition">
+                        <div>
+                            <h4 class="font-bold text-gray-800 text-sm">${student.name}</h4>
+                            <p class="text-xs text-gray-500 mt-1"><span class="bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded mr-1">${student.class}</span> <i class="fa-solid fa-phone text-[10px] ml-1"></i> ${student.phone || 'N/A'}</p>
+                        </div>
+                        <div class="bg-red-100 border border-red-200 text-red-700 px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm">
+                            ${student.absences} Absences
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        function downloadCSV() {
+            showToast("Generating CSV report...", "success");
+            window.open('https://happy-home-attendance.onrender.com/export', '_blank');
         }
 
         // Utility Functions
