@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Register - Happy Home Preparatory School</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom styles and smooth transitions */
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f3f4f6;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* Toggle Switch CSS */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #10B981; /* green-500 */
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #10B981; /* green-500 */
+        }
+        .toggle-checkbox:checked + .toggle-label:after {
+            content: "Present";
+            color: white;
+            font-size: 0.75rem;
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .toggle-label:after {
+            content: "Absent";
+            color: white;
+            font-size: 0.75rem;
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        /* Loader */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3B82F6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- App Header -->
+    <header class="bg-blue-700 text-white shadow-md z-10 flex-shrink-0">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <!-- School Logo -->
+                <img src="logo.png" alt="School Logo" class="h-10 w-10 rounded-full border-2 border-white shadow-sm object-cover bg-white">
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">Attendance Register</h1>
+                    <p class="text-xs text-blue-200">Happy Home Prep. School</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="networkStatus" class="flex items-center gap-1 text-xs bg-blue-800 px-2 py-1 rounded-full">
+                    <i class="fa-solid fa-wifi text-green-400"></i> Online
+                </span>
+            </div>
+        </div>
+        
+        <!-- Navigation Tabs -->
+        <nav class="flex overflow-x-auto bg-blue-800">
+            <button onclick="switchTab('attendance')" id="tab-btn-attendance" class="flex-1 py-3 px-4 text-center text-sm font-medium border-b-4 border-white text-white whitespace-nowrap"><i class="fa-solid fa-clipboard-user mr-1"></i> Mark</button>
+            <button onclick="switchTab('students')" id="tab-btn-students" class="flex-1 py-3 px-4 text-center text-sm font-medium border-b-4 border-transparent text-blue-200 hover:text-white whitespace-nowrap"><i class="fa-solid fa-users mr-1"></i> Students</button>
+            <button onclick="switchTab('sync')" id="tab-btn-sync" class="flex-1 py-3 px-4 text-center text-sm font-medium border-b-4 border-transparent text-blue-200 hover:text-white whitespace-nowrap">
+                <i class="fa-solid fa-rotate mr-1"></i> Sync <span id="syncBadge" class="hidden ml-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>
+            </button>
+        </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-4 container mx-auto max-w-3xl relative">
+        
+        <!-- Toast Notification Container -->
+        <div id="toastContainer" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-11/12 max-w-sm pointer-events-none"></div>
+
+        <!-- ATTENDANCE VIEW -->
+        <section id="tab-attendance" class="tab-content active pb-16">
+            <h2 class="text-xl font-bold mb-4">Mark Attendance</h2>
+            
+            <div class="bg-white rounded-xl shadow-sm p-4 mb-4 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Date</label>
+                    <input type="date" id="attendanceDate" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Class</label>
+                    <select id="attendanceClass" class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="renderAttendanceList()">
+                        <option value="">Select Class...</option>
+                        <!-- Options generated by JS -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="p-3 bg-gray-50 border-b flex justify-between items-center">
+                    <span class="text-sm font-semibold text-gray-600">Students (<span id="attendanceCount">0</span>)</span>
+                    <span class="text-xs text-gray-500">Default: Present</span>
+                </div>
+                <div id="attendanceList" class="divide-y max-h-[50vh] overflow-y-auto">
+                    <!-- Students listed here via JS -->
+                    <div class="p-8 text-center text-gray-400 text-sm">
+                        Select a class to view students.
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-50 border-t flex justify-between items-center">
+                    <p class="text-xs text-gray-500">Uncheck to mark absent.</p>
+                    <button onclick="saveAttendance()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium text-sm transition shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-save"></i> Save Records
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- STUDENTS VIEW -->
+        <section id="tab-students" class="tab-content pb-16">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Manage Students</h2>
+                <button onclick="openAddStudentModal()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium transition">
+                    <i class="fa-solid fa-plus mr-1"></i> Add New
+                </button>
+            </div>
+
+            <!-- Import/Export Tools -->
+            <div class="bg-white rounded-xl shadow-sm p-4 mb-4 flex flex-col sm:flex-row gap-3 items-center justify-between border border-blue-50">
+                <div class="w-full sm:w-auto">
+                    <label for="csvImport" class="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2 w-full sm:w-auto justify-center">
+                        <i class="fa-solid fa-file-import"></i> Bulk Import (CSV)
+                    </label>
+                    <input type="file" id="csvImport" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
+                </div>
+                <p class="text-xs text-gray-400 text-center sm:text-right">Format: Name, Class, ParentPhone</p>
+            </div>
+
+            <!-- Filters -->
+            <div class="bg-white p-3 rounded-t-xl shadow-sm border-b flex gap-2">
+                <select id="filterStudentClass" class="w-full border rounded-lg p-2 text-sm outline-none bg-gray-50" onchange="renderStudentsList()">
+                    <option value="ALL">All Classes</option>
+                    <!-- Options generated by JS -->
+                </select>
+                <input type="text" id="searchStudent" placeholder="Search name..." class="w-full border rounded-lg p-2 text-sm outline-none bg-gray-50" onkeyup="renderStudentsList()">
+            </div>
+
+            <!-- List -->
+            <div class="bg-white rounded-b-xl shadow-sm overflow-hidden divide-y">
+                <div id="studentsList" class="max-h-[60vh] overflow-y-auto">
+                    <!-- Students rendered here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- SYNC & LOGS VIEW -->
+        <section id="tab-sync" class="tab-content pb-16">
+            <h2 class="text-xl font-bold mb-4">Offline Sync & SMS Logs</h2>
+            
+            <div class="bg-white rounded-xl shadow-sm p-6 text-center mb-6 border-t-4 border-blue-500">
+                <div class="text-5xl text-blue-500 mb-3"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <h3 class="text-lg font-bold mb-1">Unsynced Records: <span id="unsyncedCountDisplay">0</span></h3>
+                <p class="text-sm text-gray-500 mb-4">Records are saved offline. Sync to push to the main server and dispatch SMS notifications to parents of absent students.</p>
+                <button id="syncNowBtn" onclick="performSync()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium shadow-md w-full sm:w-auto transition flex items-center justify-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-rotate"></i> Sync Now
+                </button>
+            </div>
+
+            <h3 class="text-md font-bold mb-3 text-gray-700">Recent SMS Activity (Simulated)</h3>
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div id="smsLogs" class="divide-y max-h-[40vh] overflow-y-auto bg-gray-50 p-2">
+                    <!-- Logs go here -->
+                    <div class="p-4 text-center text-sm text-gray-400">No recent activity.</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Add/Edit Student Modal -->
+    <div id="studentModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden opacity-0 transition-opacity">
+        <div class="bg-white rounded-xl w-11/12 max-w-md shadow-2xl transform scale-95 transition-transform" id="studentModalContent">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-lg" id="modalTitle">Add Student</h3>
+                <button onclick="closeStudentModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-4 space-y-4">
+                <input type="hidden" id="studentId">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input type="text" id="studentName" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. John Doe">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                    <select id="studentClass" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- Options generated by JS -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
+                    <input type="tel" id="studentPhone" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. +233 24 123 4567">
+                </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 rounded-b-xl flex justify-end gap-2">
+                <button onclick="closeStudentModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg text-sm font-medium transition">Cancel</button>
+                <button onclick="saveStudent()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition shadow-sm">Save Student</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Models & Constants
+        const CLASSES = [
+            'Creche', 'Nursery 1', 'Nursery 2', 'KG 1', 'KG 2', 
+            'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6', 
+            'JHS 1', 'JHS 2', 'JHS 3'
+        ];
+
+        let state = {
+            students: JSON.parse(localStorage.getItem('attendIct_students')) || [],
+            attendance: JSON.parse(localStorage.getItem('attendIct_attendance')) || [],
+            logs: JSON.parse(localStorage.getItem('attendIct_logs')) || [],
+            isOnline: navigator.onLine
+        };
+
+        // App Initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            initSelects();
+            document.getElementById('attendanceDate').valueAsDate = new Date();
+            
+            // Network listeners
+            window.addEventListener('online', updateNetworkStatus);
+            window.addEventListener('offline', updateNetworkStatus);
+            updateNetworkStatus();
+
+            // Initial render
+            updateSyncBadge();
+            renderLogs();
+        });
+
+        // Tab Navigation
+        function switchTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            // Reset tab styles
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.classList.remove('border-white', 'text-white');
+                btn.classList.add('border-transparent', 'text-blue-200');
+            });
+
+            // Show selected tab
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            // Highlight selected button
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            activeBtn.classList.remove('border-transparent', 'text-blue-200');
+            activeBtn.classList.add('border-white', 'text-white');
+
+            // Trigger specific renders
+            if(tabId === 'students') renderStudentsList();
+            if(tabId === 'attendance') renderAttendanceList();
+            if(tabId === 'sync') updateSyncBadge();
+        }
+
+        // Utility: Generate Unique ID
+        function generateId() {
+            return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+        }
+
+        // Utility: Show Toast Notification
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const colors = type === 'success' ? 'bg-gray-800 text-white' : 
+                           type === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white';
+            const icon = type === 'success' ? 'fa-check-circle' : 
+                         type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle';
+
+            toast.className = `${colors} px-4 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 transform transition-all duration-300 translate-y-[-20px] opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => { toast.classList.remove('translate-y-[-20px]', 'opacity-0'); }, 10);
+            
+            // Animate out & remove
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => { toast.remove(); }, 300);
+            }, 3000);
+        }
+
+        // Initialize Dropdowns
+        function initSelects() {
+            const selects = ['attendanceClass', 'studentClass', 'filterStudentClass'];
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) {
+                    CLASSES.forEach(c => {
+                        const option = document.createElement('option');
+                        option.value = c;
+                        option.textContent = c;
+                        el.appendChild(option);
+                    });
+                }
+            });
+        }
+
+        // ----- STUDENT MANAGEMENT -----
+        function saveToLocal(key, data) {
+            localStorage.setItem(`attendIct_${key}`, JSON.stringify(data));
+        }
+
+        function renderStudentsList() {
+            const listEl = document.getElementById('studentsList');
+            const filterClass = document.getElementById('filterStudentClass').value;
+            const searchTxt = document.getElementById('searchStudent').value.toLowerCase();
+            
+            let filtered = state.students.filter(s => {
+                const matchClass = filterClass === 'ALL' || s.classId === filterClass;
+                const matchName = s.name.toLowerCase().includes(searchTxt);
+                return matchClass && matchName;
+            });
+
+            // Sort by class then name
+            filtered.sort((a, b) => {
+                if (a.classId !== b.classId) return CLASSES.indexOf(a.classId) - CLASSES.indexOf(b.classId);
+                return a.name.localeCompare(b.name);
+            });
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `<div class="p-8 text-center text-gray-400 text-sm">No students found.</div>`;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(student => {
+                html += `
+                    <div class="p-4 hover:bg-gray-50 flex justify-between items-center transition">
+                        <div>
+                            <h4 class="font-semibold text-gray-800 text-sm">${student.name}</h4>
+                            <p class="text-xs text-gray-500">
+                                <span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded mr-1">${student.classId}</span> 
+                                <i class="fa-solid fa-phone text-[10px] ml-1"></i> ${student.parentPhone || 'No Phone'}
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick='editStudent(${JSON.stringify(student).replace(/'/g, "&#39;")})' class="w-8 h-8 rounded bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 transition flex items-center justify-center"><i class="fa-solid fa-pen text-xs"></i></button>
+                            <button onclick="deleteStudent('${student.id}')" class="w-8 h-8 rounded bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 transition flex items-center justify-center"><i class="fa-solid fa-trash text-xs"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        // Modal Logic
+        const modal = document.getElementById('studentModal');
+        const modalContent = document.getElementById('studentModalContent');
+
+        function openAddStudentModal() {
+            document.getElementById('modalTitle').textContent = 'Add Student';
+            document.getElementById('studentId').value = '';
+            document.getElementById('studentName').value = '';
+            document.getElementById('studentPhone').value = '';
+            // keep current class if any, or reset
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function editStudent(student) {
+            document.getElementById('modalTitle').textContent = 'Edit Student';
+            document.getElementById('studentId').value = student.id;
+            document.getElementById('studentName').value = student.name;
+            document.getElementById('studentClass').value = student.classId;
+            document.getElementById('studentPhone').value = student.parentPhone;
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeStudentModal() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        function saveStudent() {
+            const id = document.getElementById('studentId').value;
+            const name = document.getElementById('studentName').value.trim();
+            const classId = document.getElementById('studentClass').value;
+            const parentPhone = document.getElementById('studentPhone').value.trim();
+
+            if (!name || !classId) {
+                showToast('Name and Class are required', 'error');
+                return;
+            }
+
+            if (id) {
+                // Update
+                const index = state.students.findIndex(s => s.id === id);
+                if (index > -1) {
+                    state.students[index] = { id, name, classId, parentPhone };
+                    showToast('Student updated');
+                }
+            } else {
+                // Add
+                state.students.push({ id: generateId(), name, classId, parentPhone });
+                showToast('Student added successfully');
+            }
+
+            saveToLocal('students', state.students);
+            renderStudentsList();
+            closeStudentModal();
+        }
+
+        function deleteStudent(id) {
+            state.students = state.students.filter(s => s.id !== id);
+            saveToLocal('students', state.students);
+            renderStudentsList();
+            showToast('Student removed successfully');
+        }
+
+        // CSV Import
+        function handleCSVImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const text = e.target.result;
+                const rows = text.split('\n');
+                let imported = 0;
+
+                rows.forEach((row, index) => {
+                    // Skip empty rows or header (assuming row 0 might be header)
+                    if(row.trim() === '' || (index === 0 && row.toLowerCase().includes('name'))) return;
+                    
+                    // Simple CSV split (not handling quotes inside commas for this basic version)
+                    const cols = row.split(',').map(c => c.trim());
+                    if (cols.length >= 2) {
+                        const name = cols[0];
+                        let classStr = cols[1];
+                        const phone = cols[2] || '';
+
+                        // Normalize class string to match predefined CLASSES if possible
+                        const matchedClass = CLASSES.find(c => c.toLowerCase() === classStr.toLowerCase());
+                        if (name && matchedClass) {
+                            state.students.push({
+                                id: generateId(),
+                                name: name,
+                                classId: matchedClass,
+                                parentPhone: phone
+                            });
+                            imported++;
+                        }
+                    }
+                });
+
+                if (imported > 0) {
+                    saveToLocal('students', state.students);
+                    renderStudentsList();
+                    showToast(`${imported} students imported successfully`);
+                } else {
+                    showToast('No valid students found in CSV. Check format.', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        // ----- ATTENDANCE LOGIC -----
+        function renderAttendanceList() {
+            const date = document.getElementById('attendanceDate').value;
+            const classId = document.getElementById('attendanceClass').value;
+            const listEl = document.getElementById('attendanceList');
+            const countEl = document.getElementById('attendanceCount');
+
+            if (!classId || !date) {
+                listEl.innerHTML = `<div class="p-8 text-center text-gray-400 text-sm">Select date and class.</div>`;
+                countEl.textContent = '0';
+                return;
+            }
+
+            const classStudents = state.students.filter(s => s.classId === classId);
+            countEl.textContent = classStudents.length;
+
+            if (classStudents.length === 0) {
+                listEl.innerHTML = `<div class="p-8 text-center text-gray-400 text-sm">No students in this class.</div>`;
+                return;
+            }
+
+            // Sort alphabetically
+            classStudents.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Check if record exists for this date/class
+            const existingRecord = state.attendance.find(a => a.date === date && a.classId === classId);
+            
+            let html = '';
+            classStudents.forEach(student => {
+                let isPresent = true; // Default
+                if (existingRecord) {
+                    const studentRec = existingRecord.records.find(r => r.studentId === student.id);
+                    if (studentRec && studentRec.status === 'absent') {
+                        isPresent = false;
+                    }
+                }
+
+                html += `
+                    <div class="p-3 flex justify-between items-center hover:bg-gray-50">
+                        <div>
+                            <h4 class="font-semibold text-gray-800 text-sm">${student.name}</h4>
+                        </div>
+                        
+                        <!-- Toggle Switch -->
+                        <div class="relative inline-block w-20 h-7 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="attendanceToggle" id="toggle_${student.id}" value="${student.id}" ${isPresent ? 'checked' : ''} class="toggle-checkbox absolute block w-7 h-7 rounded-full bg-white border-4 border-gray-300 appearance-none cursor-pointer transition-transform duration-300 z-10"/>
+                            <label for="toggle_${student.id}" class="toggle-label block overflow-hidden h-7 rounded-full bg-gray-300 cursor-pointer transition-colors duration-300 relative"></label>
+                        </div>
+                    </div>
+                `;
+            });
+
+            listEl.innerHTML = html;
+        }
+
+        function saveAttendance() {
+            const date = document.getElementById('attendanceDate').value;
+            const classId = document.getElementById('attendanceClass').value;
+            
+            if (!classId || !date) {
+                showToast('Please select a class and date', 'error');
+                return;
+            }
+
+            const toggles = document.querySelectorAll('input[name="attendanceToggle"]');
+            if (toggles.length === 0) return;
+
+            const records = [];
+            toggles.forEach(toggle => {
+                records.push({
+                    studentId: toggle.value,
+                    status: toggle.checked ? 'present' : 'absent'
+                });
+            });
+
+            // Find existing
+            const recordIndex = state.attendance.findIndex(a => a.date === date && a.classId === classId);
+            
+            const attendanceData = {
+                id: recordIndex > -1 ? state.attendance[recordIndex].id : generateId(),
+                date,
+                classId,
+                records,
+                synced: false // Marking requires fresh sync
+            };
+
+            if (recordIndex > -1) {
+                state.attendance[recordIndex] = attendanceData;
+            } else {
+                state.attendance.push(attendanceData);
+            }
+
+            saveToLocal('attendance', state.attendance);
+            showToast(`Attendance saved for ${classId} (Offline)`);
+            updateSyncBadge();
+        }
+
+        // ----- NETWORK & SYNC LOGIC -----
+        function updateNetworkStatus() {
+            state.isOnline = navigator.onLine;
+            const statusEl = document.getElementById('networkStatus');
+            const syncBtn = document.getElementById('syncNowBtn');
+            
+            if (state.isOnline) {
+                statusEl.innerHTML = `<i class="fa-solid fa-wifi text-green-400"></i> Online`;
+                statusEl.className = "flex items-center gap-1 text-xs bg-blue-800 px-2 py-1 rounded-full text-white";
+                if(syncBtn) syncBtn.disabled = false;
+            } else {
+                statusEl.innerHTML = `<i class="fa-solid fa-plane text-yellow-400"></i> Offline`;
+                statusEl.className = "flex items-center gap-1 text-xs bg-gray-600 px-2 py-1 rounded-full text-white";
+                if(syncBtn) syncBtn.disabled = true;
+            }
+        }
+
+        function updateSyncBadge() {
+            const unsynced = state.attendance.filter(a => !a.synced).length;
+            const badge = document.getElementById('syncBadge');
+            const display = document.getElementById('unsyncedCountDisplay');
+            
+            if(badge) {
+                if (unsynced > 0) {
+                    badge.textContent = unsynced;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+            if(display) display.textContent = unsynced;
+        }
+
+        async function performSync() {
+            if (!state.isOnline) {
+                showToast("Cannot sync while offline", "error");
+                return;
+            }
+
+            const unsyncedRecords = state.attendance.filter(a => !a.synced);
+            
+            if (unsyncedRecords.length === 0) {
+                showToast("All records are already synced", "info");
+                return;
+            }
+
+            // UI Feedback
+            const btn = document.getElementById('syncNowBtn');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = `<div class="loader"></div> Syncing...`;
+            btn.disabled = true;
+
+            // Prepare payload for backend (enriching with student names and phone numbers)
+            const payload = unsyncedRecords.map(record => ({
+                date: record.date,
+                class_name: record.classId,
+                records: record.records.map(r => {
+                    const student = state.students.find(s => s.id === r.studentId);
+                    return {
+                        student_id: r.studentId,
+                        student_name: student ? student.name : 'Unknown',
+                        status: r.status,
+                        parent_phone: student ? student.parentPhone : ''
+                    };
+                })
+            }));
+
+            try {
+                // Send data to the local Python backend
+                const response = await fetch('http://127.0.0.1:5000/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ attendance_data: payload })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server responded with status ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                // If successful, mark local records as synced
+                state.attendance.forEach(record => {
+                    if (!record.synced) record.synced = true;
+                });
+                saveToLocal('attendance', state.attendance);
+                
+                // Log the sync activity in the UI
+                const logMsg = `Successfully synced ${unsyncedRecords.length} record(s) to server. SMS dispatch triggered for absentees.`;
+                state.logs = [{ id: generateId(), timestamp: new Date().toLocaleString(), message: logMsg }, ...state.logs].slice(0, 50);
+                saveToLocal('logs', state.logs);
+
+                showToast("Sync complete! Data sent to server.");
+            } catch (error) {
+                console.error("Sync Error:", error);
+                showToast("Failed to sync with server. Is the backend running?", "error");
+            } finally {
+                // Restore UI State
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                updateSyncBadge();
+                renderLogs();
+            }
+        }
+
+        function renderLogs() {
+            const logsEl = document.getElementById('smsLogs');
+            if (state.logs.length === 0) {
+                logsEl.innerHTML = `<div class="p-4 text-center text-sm text-gray-400">No recent activity.</div>`;
+                return;
+            }
+
+            let html = '';
+            state.logs.forEach(log => {
+                html += `
+                    <div class="p-3 bg-white text-sm">
+                        <p class="text-gray-800"><i class="fa-solid fa-message text-green-500 mr-1"></i> ${log.message}</p>
+                        <p class="text-xs text-gray-400 mt-1"><i class="fa-regular fa-clock"></i> ${log.timestamp}</p>
+                    </div>
+                `;
+            });
+            logsEl.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
