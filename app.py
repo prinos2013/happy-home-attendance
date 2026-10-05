@@ -9,6 +9,7 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     return {"status": "online", "message": "Attendance API is running"}, 200
+
 # Allow your frontend to communicate with this backend
 CORS(app)
 
@@ -94,6 +95,45 @@ def sync_attendance():
         "status": "success", 
         "message": f"Data synced successfully. {absent_count} SMS notification(s) dispatched."
     }), 200
+
+@app.route('/stats', methods=['GET'])
+def get_stats():
+    """Calculate attendance statistics for the dashboard."""
+    try:
+        conn = sqlite3.connect('attendance.db')
+        cursor = conn.cursor()
+        
+        # Query the 'records' table to count present/absent per class
+        cursor.execute('''
+            SELECT class_name, status, COUNT(*) as count 
+            FROM records 
+            GROUP BY class_name, status
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # Format the data into a dictionary for the frontend chart
+        stats_data = {}
+        for row in rows:
+            class_name = row[0]
+            status = row[1].lower()
+            count = row[2]
+            
+            if class_name not in stats_data:
+                stats_data[class_name] = {'present': 0, 'absent': 0}
+            
+            if status in ['present', 'absent']:
+                stats_data[class_name][status] = count
+                
+        return jsonify({
+            "success": True, 
+            "data": stats_data
+        }), 200
+
+    except Exception as e:
+        print("Error fetching stats:", e)
+        return jsonify({"success": False, "error": "Failed to load statistics"}), 500
 
 if __name__ == '__main__':
     init_db()
